@@ -1,8 +1,16 @@
+import Navbar from "../Navbar";
+
 const Surveys = () => {
     return ( 
-        <div className="courses">
-            <p>WIP</p>
+        <div className="surveys">
+            <div className="navbar">
+                <Navbar />
+            </div>
+            <div className="surveysContent">
+                <p>WIP</p>
+            </div>
         </div>
+        
      );
 }
  

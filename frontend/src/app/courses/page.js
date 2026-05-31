@@ -23,9 +23,10 @@ const Courses = () => {
             <div className="addCourse">
                 <Link href="/courses/add">Add Course Listing</Link>
             </div>
-            <div className="courseListings">
+            <div className="courseListings" >
                 {listings.map((listing, idx) => (
-                    <div key ={idx}>
+                    <div key = {idx} className = "courseListing" style = {{marginBottom: "20px",
+  padding: "15px"}}>
                         <h3>Course Code: {listing.courseCode}</h3>
                         <p>Current Slot: {listing.currentSlot}</p>
                         <p>Desired Slot: {listing.desiredSlot}</p>

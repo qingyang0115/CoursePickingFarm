@@ -9,7 +9,6 @@ const CourseAdd = () => {
     const [courseCode, setcourseCode] = useState('');
     const [currentSlot, setCurrentSlot] = useState('');
     const [desiredSlot, setDesiredSlot] = useState('');
-    const [comments, setComments] = useState('');
     const [error, setError] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -17,7 +16,7 @@ const CourseAdd = () => {
         e.preventDefault();
         setError("");
         setIsSubmitting(true);
-        const newListing = { courseCode, currentSlot, desiredSlot, comments };
+        const newListing = { courseCode, currentSlot, desiredSlot };
         const user = auth.currentUser;
 
         if (!user) {
@@ -58,7 +57,7 @@ const CourseAdd = () => {
                 <Navbar />
             </div>
             <div className="addListingsContent"> 
-                <h2>Add a New Course Swap Listing</h2>
+                <h2>Add a New Blog</h2>
                 <form onSubmit={handleSubmit}>
                     <label>Module Code:</label>
                     <input 
@@ -74,19 +73,12 @@ const CourseAdd = () => {
                     value={currentSlot}
                     onChange={(e) => setCurrentSlot(e.target.value)}
                     />
-                    <label>Desired Slot(s):</label>
+                    <label>Desired Slot:</label>
                     <input 
                     type="text" 
                     required 
                     value={desiredSlot}
                     onChange={(e) => setDesiredSlot(e.target.value)}
-                    placeholder="e.g. tutorial 1, tutorial 2"
-                    />
-                    <label>Optional Notes:</label>
-                    <textarea
-                      value={comments}
-                      onChange={(e) => setComments(e.target.value)}
-                      placeholder="Add optional swap details or incentives"
                     />
                     {error && <p>{error}</p>}
                     <button disabled={isSubmitting} style={{ cursor: "pointer" }}>

@@ -13,17 +13,6 @@ const courseListingSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
-        comments: {
-            type: String,
-            trim: true,
-        },
-        createdBy: {
-            type: String,
-            required: true,
-        },
-        createdByEmail: {
-            type: String,
-        },
     },
     { timestamps: true }
 )

@@ -5,7 +5,7 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 const admin = require("firebase-admin");
 const CourseListing = require("./models/CourseListing");
-
+const { notifyMatch } = require("./telegramBot");
 const app = express();
 const PORT = 5050;
 app.use(cors());
@@ -80,6 +80,17 @@ app.post("/api/courseListings", requireAuth, async (req,res) => {
         });
 
         const savedListing = await newListing.save();
+
+        const match = await CourseListing.findOne({
+            courseCode: desiredSlot,
+            currentSlot: currentSlot,
+            desiredSlot: courseCode,
+        });
+        // If match is found, notify both users
+        if (match) {
+            await notifyMatch(savedListing, match);
+        }
+
         res.status(201).json(savedListing);
     } catch (error) {
         res.status(500).json({ error: "Failed to create listing" });
@@ -116,6 +127,8 @@ mongoose
     .catch((err) => {
         console.error("MongoDB connection error:", err);
     });
+
+
 
 
 

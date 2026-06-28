@@ -5,12 +5,14 @@ import { useEffect, useState } from "react";
 import { auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
+
 const Courses = () => {
   const [listings, setListings] = useState([]);
   const [userId, setUserId] = useState(null);
   const [error, setError] = useState("");
   const [filterCourse, setFilterCourse] = useState("");
   const [filterSlot, setFilterSlot] = useState("");
+  const [showMineOnly, setShowMineOnly] = useState(false);
 
   useEffect(() => {
     return onAuthStateChanged(auth, (user) => {
@@ -29,15 +31,21 @@ const Courses = () => {
   }, []);
 
   const filteredListings = listings.filter((listing) => {
+
     const courseMatch =
-      filterCourse === "" ||
-      listing.courseCode.toLowerCase().includes(filterCourse.toLowerCase());
+        filterCourse === "" ||
+        listing.courseCode.toLowerCase().includes(filterCourse.toLowerCase());
+
     const slotMatch =
-      filterSlot === "" ||
-      listing.currentSlot.toLowerCase().includes(filterSlot.toLowerCase()) ||
-      listing.desiredSlot.toLowerCase().includes(filterSlot.toLowerCase());
-    return courseMatch && slotMatch;
-  });
+        filterSlot === "" ||
+        listing.currentSlot.toLowerCase().includes(filterSlot.toLowerCase()) ||
+        listing.desiredSlot.toLowerCase().includes(filterSlot.toLowerCase());
+
+    const mineMatch =
+        !showMineOnly || listing.createdBy === userId;
+
+    return courseMatch && slotMatch && mineMatch;
+});
 
   const handleDelete = async (id) => {
     const user = auth.currentUser;
@@ -88,6 +96,14 @@ const Courses = () => {
           onChange={(e) => setFilterSlot(e.target.value)}
           style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #ccc", fontSize: "14px", minWidth: "220px" }}
         />
+        {userId && (
+            <button
+                onClick={() => setShowMineOnly(!showMineOnly)}
+                style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #ccc", cursor: "pointer", fontSize: "14px"}}
+            >
+                {showMineOnly ? "Show All Listings" : "Show My Listings"}
+            </button>
+        )}
         {(filterCourse || filterSlot) && (
           <button
             onClick={() => { setFilterCourse(""); setFilterSlot(""); }}

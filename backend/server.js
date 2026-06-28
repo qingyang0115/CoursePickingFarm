@@ -5,7 +5,9 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 const admin = require("firebase-admin");
 const CourseListing = require("./models/CourseListing");
+const Item = require("./models/Item");
 const { notifyMatch } = require("./telegramBot");
+const { findMatch } = require("./utils/matchCourses");
 const app = express();
 const PORT = 5050;
 app.use(cors());
@@ -64,9 +66,15 @@ app.get("/api/courseListings", async (req, res) => {
     }
 });
 
-app.post("/api/courseListings", requireAuth, async (req,res) => {
+app.post("/api/courseListings", requireAuth, async (req, res) => {
     try {
-        const { courseCode, currentSlot, desiredSlot, comments, telegramHandle } = req.body;
+        const {
+            courseCode,
+            currentSlot,
+            desiredSlot,
+            comments,
+            telegramHandle,
+        } = req.body;
 
         const newListing = new CourseListing({
             courseCode,
@@ -80,17 +88,15 @@ app.post("/api/courseListings", requireAuth, async (req,res) => {
 
         const savedListing = await newListing.save();
 
-        const match = await CourseListing.findOne({
-            courseCode: courseCode,
-            currentSlot: desiredSlot,
-            desiredSlot: currentSlot,
-        });
-        // If match is found, notify both users
+        // check for match
+        const match = await findMatch(savedListing);
+
         if (match) {
             await notifyMatch(savedListing, match);
         }
 
         res.status(201).json(savedListing);
+
     } catch (error) {
         res.status(500).json({ error: "Failed to create listing" });
     }
@@ -113,6 +119,35 @@ app.delete("/api/courseListings/:id", requireAuth, async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: "Failed to remove listing" });
     }
+});
+
+app.get("/api/items", async (req, res) => {
+  try {
+    const items = await Item.find().sort({ createdAt: -1 });
+    res.json(items);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch items" });
+  }
+});
+
+app.post("/api/items", requireAuth, async (req, res) => {
+  try {
+    const { title, price, description, category } = req.body;
+
+    const newItem = new Item({
+      title,
+      price,
+      description,
+      category,
+      createdBy: req.user.uid,
+      createdByEmail: req.user.email,
+    });
+
+    const saved = await newItem.save();
+    res.status(201).json(saved);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to create item" });
+  }
 });
 
 mongoose

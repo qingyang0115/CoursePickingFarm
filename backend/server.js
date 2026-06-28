@@ -55,8 +55,6 @@ app.get("/", (req, res) => {
     res.send("Backend is running");
 });
 
-//let listings = []
-
 app.get("/api/courseListings", async (req, res) => {
     try {
         const listings = await CourseListing.find().sort({ createdAt: -1 });
@@ -68,13 +66,14 @@ app.get("/api/courseListings", async (req, res) => {
 
 app.post("/api/courseListings", requireAuth, async (req,res) => {
     try {
-        const { courseCode, currentSlot, desiredSlot, comments } = req.body;
+        const { courseCode, currentSlot, desiredSlot, comments, telegramHandle } = req.body;
 
         const newListing = new CourseListing({
             courseCode,
             currentSlot,
             desiredSlot,
             comments,
+            telegramHandle,
             createdBy: req.user.uid,
             createdByEmail: req.user.email,
         });
@@ -82,9 +81,9 @@ app.post("/api/courseListings", requireAuth, async (req,res) => {
         const savedListing = await newListing.save();
 
         const match = await CourseListing.findOne({
-            courseCode: desiredSlot,
-            currentSlot: currentSlot,
-            desiredSlot: courseCode,
+            courseCode: courseCode,
+            currentSlot: desiredSlot,
+            desiredSlot: currentSlot,
         });
         // If match is found, notify both users
         if (match) {

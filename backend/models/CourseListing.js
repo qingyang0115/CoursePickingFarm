@@ -24,6 +24,9 @@ const courseListingSchema = new mongoose.Schema(
         createdByEmail: {
             type: String,
         },
+        telegramHandle: {
+            type: String,
+        },
     },
     { timestamps: true }
 )

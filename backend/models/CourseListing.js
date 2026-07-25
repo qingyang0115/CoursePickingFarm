@@ -27,6 +27,11 @@ const courseListingSchema = new mongoose.Schema(
         telegramHandle: {
             type: String,
         },
+        status: {
+            type: String,
+            enum: ["active", "pending", "confirmed"],
+            default: "active",
+        },
     },
     { timestamps: true }
 )

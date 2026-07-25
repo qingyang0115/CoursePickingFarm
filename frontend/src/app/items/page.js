@@ -43,6 +43,13 @@ const Items = () => {
       <div style={{ display: "grid", gap: 20 }}>
         {filteredItems.map((item) => (
           <div key={item._id} style={{ border: "1px solid #ccc", padding: 10 }}>
+            {item.image && (
+              <img
+                src={item.image}
+                alt={item.title}
+                style={{ width: "100%", maxWidth: 200, display: "block" }}
+              />
+            )}
             <h3>{item.title}</h3>
             <p>${item.price}</p>
             <p>{item.description}</p>

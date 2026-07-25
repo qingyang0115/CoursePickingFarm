@@ -11,7 +11,7 @@ const { findMatch } = require("./utils/matchCourses");
 const app = express();
 const PORT = 5050;
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 
 const hasFirebaseAdminEnv =
     process.env.FIREBASE_PROJECT_ID &&
@@ -87,11 +87,14 @@ app.post("/api/courseListings", requireAuth, async (req, res) => {
         });
 
         const savedListing = await newListing.save();
+        console.log("Saved listing:", savedListing.courseCode, savedListing.currentSlot, "->", savedListing.desiredSlot);
 
         // check for match
         const match = await findMatch(savedListing);
+        console.log("Match found:", match ? `${match.courseCode} ${match.currentSlot}->${match.desiredSlot}` : "none");
 
         if (match) {
+            console.log("Sending Telegram notifications to:", savedListing.telegramHandle, "and", match.telegramHandle);
             await notifyMatch(savedListing, match);
         }
 
@@ -132,13 +135,14 @@ app.get("/api/items", async (req, res) => {
 
 app.post("/api/items", requireAuth, async (req, res) => {
   try {
-    const { title, price, description, category } = req.body;
+    const { title, price, description, category, image } = req.body;
 
     const newItem = new Item({
       title,
       price,
       description,
       category,
+      image,
       createdBy: req.user.uid,
       createdByEmail: req.user.email,
     });

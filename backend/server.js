@@ -10,7 +10,7 @@ const SwapMatch = require("./models/SwapMatch");
 require("./bot"); // registers callback_query / command handlers as a side effect
 const { queueMatchNotification } = require("./bot/notify");
 const { startExpiryJob } = require("./jobs/expireMatches");
-const { findAllMatches } = require("./utils/matchCourses");
+const { findAllMatches, ACTIVE_FILTER } = require("./utils/matchCourses");
 
 const MATCH_TTL_MS = 24 * 60 * 60 * 1000;
 const app = express();
@@ -64,7 +64,7 @@ app.get("/", (req, res) => {
 
 app.get("/api/courseListings", async (req, res) => {
     try {
-        const listings = await CourseListing.find().sort({ createdAt: -1 });
+        const listings = await CourseListing.find(ACTIVE_FILTER).sort({ createdAt: -1 });
         res.json(listings);
     } catch (error) {
         res.status(500).json({ error: "Failed to fetch listings" });

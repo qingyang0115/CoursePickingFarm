@@ -29,7 +29,7 @@ const Login = () => {
         await signInWithEmailAndPassword(auth, email, password);
       }
 
-      router.push("/courses");
+      router.push("/profile");
     } catch (err) {
       setError(err.message);
     } finally {

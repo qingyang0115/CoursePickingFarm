@@ -11,6 +11,8 @@ require("./bot"); // registers callback_query / command handlers as a side effec
 const { queueMatchNotification } = require("./bot/notify");
 const { startExpiryJob } = require("./jobs/expireMatches");
 const { findAllMatches } = require("./utils/matchCourses");
+const UserProfile = require("./models/UserProfile");
+const Survey = require("./models/Survey");
 
 const MATCH_TTL_MS = 24 * 60 * 60 * 1000;
 const app = express();
@@ -56,6 +58,49 @@ const requireAuth = async (req, res, next) => {
     } catch (error) {
         res.status(401).json({ error: "Invalid auth token" });
     }
+};
+
+const normalizeText = (value) => {
+    return typeof value === "string" ? value.trim().toLowerCase() : "";
+};
+
+const surveyMatchesProfile = (profile, survey) => {
+    if (!profile) return false;
+
+    if (
+        (survey.minAge !== undefined && survey.minAge !== null) ||
+        (survey.maxAge !== undefined && survey.maxAge !== null)
+    ) {
+        if (profile.age === undefined || profile.age === null) return false;
+
+        if (
+            survey.minAge !== undefined &&
+            survey.minAge !== null &&
+            profile.age < survey.minAge
+        ) {
+            return false;
+        }
+
+        if (
+            survey.maxAge !== undefined &&
+            survey.maxAge !== null &&
+            profile.age > survey.maxAge
+        ) {
+            return false;
+        }
+    }
+
+    if (survey.sex && survey.sex !== "") {
+        if (!profile.sex || profile.sex !== survey.sex) return false;
+    }
+
+    if (survey.major && survey.major !== "") {
+        if (normalizeText(profile.major) !== normalizeText(survey.major)) {
+            return false;
+        }
+    }
+
+    return true;
 };
 
 app.get("/", (req, res) => {
@@ -147,12 +192,30 @@ app.delete("/api/courseListings/:id", requireAuth, async (req, res) => {
 });
 
 app.get("/api/items", async (req, res) => {
-  try {
-    const items = await Item.find().sort({ createdAt: -1 });
-    res.json(items);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch items" });
-  }
+    try {
+        const items = await Item.find().sort({ createdAt: -1 });
+
+        const sellerUids = [...new Set(items.map((item) => item.createdBy).filter(Boolean))];
+
+        const profiles = sellerUids.length > 0
+            ? await UserProfile.find({ uid: { $in: sellerUids } }).select("uid telegramHandle")
+            : [];
+
+        const profileMap = new Map(profiles.map((profile) => [profile.uid, profile]));
+
+        const itemsWithSeller = items.map((item) => {
+            const profile = profileMap.get(item.createdBy);
+
+            return {
+                ...item.toObject(),
+                sellerTelegramHandle: profile?.telegramHandle || "",
+            };
+        });
+
+        res.json(itemsWithSeller);
+    } catch (error) {
+        res.status(500).json({ error: "Failed to fetch items" });
+    }
 });
 
 app.post("/api/items", requireAuth, async (req, res) => {
@@ -174,6 +237,183 @@ app.post("/api/items", requireAuth, async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: "Failed to create item" });
   }
+});
+
+app.get("/api/profile/me", requireAuth, async (req, res) => {
+    try {
+        const profile = await UserProfile.findOne({ uid: req.user.uid });
+        res.json(profile);
+    } catch (error) {
+        res.status(500).json({ error: "Failed to fetch profile" });
+    }
+});
+
+app.put("/api/profile/me", requireAuth, async (req, res) => {
+    try {
+        const { name, age, sex, major, telegramHandle } = req.body;
+
+        let parsedAge;
+        if (age === "" || age === null || age === undefined) {
+            parsedAge = undefined;
+        } else {
+            parsedAge = Number(age);
+            if (!Number.isInteger(parsedAge) || parsedAge < 0 || parsedAge > 120) {
+                return res.status(400).json({ error: "Age must be a valid number between 0 and 120" });
+            }
+        }
+
+        if (sex && !["M", "F"].includes(sex)) {
+            return res.status(400).json({ error: "Sex must be M or F" });
+        }
+
+        const normalizedTelegramHandle =
+            typeof telegramHandle === "string"
+                ? telegramHandle.trim().replace(/^@/, "")
+                : "";
+
+        if (!normalizedTelegramHandle) {
+            return res.status(400).json({ error: "Telegram handle is required" });
+        }
+
+        const updatedProfile = await UserProfile.findOneAndUpdate(
+            { uid: req.user.uid },
+            {
+                uid: req.user.uid,
+                email: req.user.email,
+                name: typeof name === "string" ? name.trim() : "",
+                age: parsedAge,
+                sex: typeof sex === "string" ? sex.trim() : "",
+                major: typeof major === "string" ? major.trim() : "",
+                telegramHandle: normalizedTelegramHandle,
+            },
+            {
+                new: true,
+                upsert: true,
+                runValidators: true,
+                setDefaultsOnInsert: true,
+            }
+        );
+
+        res.json(updatedProfile);
+    } catch (error) {
+        console.error("Failed to save profile:", error);
+        res.status(500).json({ error: "Failed to save profile" });
+    }
+});
+
+app.get("/api/surveys", async (req, res) => {
+    try {
+        const surveys = await Survey.find().sort({ createdAt: -1 });
+        res.json(surveys);
+    } catch (error) {
+        res.status(500).json({ error: "Failed to fetch surveys" });
+    }
+});
+
+app.get("/api/surveys/matching", requireAuth, async (req, res) => {
+    try {
+        const profile = await UserProfile.findOne({ uid: req.user.uid });
+
+        if (!profile) {
+            return res.json([]);
+        }
+
+        const surveys = await Survey.find().sort({ createdAt: -1 });
+        const matchingSurveys = surveys.filter((survey) =>
+            surveyMatchesProfile(profile, survey)
+        );
+
+        res.json(matchingSurveys);
+    } catch (error) {
+        res.status(500).json({ error: "Failed to fetch matching surveys" });
+    }
+});
+
+app.post("/api/surveys", requireAuth, async (req, res) => {
+    try {
+        const {
+            title,
+            description,
+            remuneration,
+            telegramHandle,
+            minAge,
+            maxAge,
+            sex,
+            major,
+        } = req.body;
+
+        if (!title || !description || !remuneration || !telegramHandle) {
+            return res.status(400).json({ error: "Missing required fields" });
+        }
+
+        let parsedMinAge;
+        if (minAge === "" || minAge === null || minAge === undefined) {
+            parsedMinAge = undefined;
+        } else {
+            parsedMinAge = Number(minAge);
+            if (
+                !Number.isInteger(parsedMinAge) ||
+                parsedMinAge < 0 ||
+                parsedMinAge > 120
+            ) {
+                return res.status(400).json({ error: "Minimum age must be a valid number between 0 and 120" });
+            }
+        }
+
+        let parsedMaxAge;
+        if (maxAge === "" || maxAge === null || maxAge === undefined) {
+            parsedMaxAge = undefined;
+        } else {
+            parsedMaxAge = Number(maxAge);
+            if (
+                !Number.isInteger(parsedMaxAge) ||
+                parsedMaxAge < 0 ||
+                parsedMaxAge > 120
+            ) {
+                return res.status(400).json({ error: "Maximum age must be a valid number between 0 and 120" });
+            }
+        }
+
+        if (
+            parsedMinAge !== undefined &&
+            parsedMaxAge !== undefined &&
+            parsedMinAge > parsedMaxAge
+        ) {
+            return res.status(400).json({ error: "Minimum age cannot be greater than maximum age" });
+        }
+
+        if (sex && !["M", "F"].includes(sex)) {
+            return res.status(400).json({ error: "Gender must be M or F" });
+        }
+
+        const normalizedTelegramHandle =
+            typeof telegramHandle === "string"
+                ? telegramHandle.trim().replace(/^@/, "")
+                : "";
+
+        if (!normalizedTelegramHandle) {
+            return res.status(400).json({ error: "Telegram handle is required" });
+        }
+
+        const newSurvey = new Survey({
+            title: typeof title === "string" ? title.trim() : "",
+            description: typeof description === "string" ? description.trim() : "",
+            remuneration: typeof remuneration === "string" ? remuneration.trim() : "",
+            telegramHandle: normalizedTelegramHandle,
+            minAge: parsedMinAge,
+            maxAge: parsedMaxAge,
+            sex: typeof sex === "string" ? sex.trim() : "",
+            major: typeof major === "string" ? major.trim() : "",
+            createdBy: req.user.uid,
+            createdByEmail: req.user.email,
+        });
+
+        const savedSurvey = await newSurvey.save();
+        res.status(201).json(savedSurvey);
+    } catch (error) {
+        console.error("Failed to create survey:", error);
+        res.status(500).json({ error: "Failed to create survey" });
+    }
 });
 
 mongoose

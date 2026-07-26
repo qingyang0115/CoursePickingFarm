@@ -31,7 +31,7 @@ const CourseAdd = () => {
     try {
       const token = await user.getIdToken();
 
-      const response = await fetch("http://localhost:5050/api/courseListings/", {
+      const response = await fetch("http://127.0.0.1:5050/api/courseListings/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
